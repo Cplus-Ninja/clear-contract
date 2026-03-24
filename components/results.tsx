@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Check,
   Copy,
+  Download,
   FileWarning,
   Info,
   ShieldAlert,
@@ -18,6 +19,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { generateNegotiationEmail } from "@/app/actions/generate-negotiation-email";
 import { JargonRichText } from "@/components/jargon-text";
+import { LegalDisclaimer } from "@/components/legal-disclaimer";
+import {
+  analysisReportFilename,
+  buildAnalysisReportText,
+} from "@/lib/format-analysis-report";
 
 interface ResultsProps {
   analysis: ContractAnalysis;
@@ -89,28 +95,51 @@ export function Results({ analysis, fileName, demoMode = false }: ResultsProps) 
     }
   }
 
+  function handleDownloadReport() {
+    const body = buildAnalysisReportText(fileName, analysis, { demoMode: isDemo });
+    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = analysisReportFilename(fileName);
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Tooltip.Provider delay={400} closeDelay={100}>
-      <Card className="overflow-hidden border-border/50 shadow-sm">
-        <CardHeader className="border-b border-border/40 bg-linear-to-r from-muted/30 to-muted/10 px-5 py-5 sm:px-6">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-            <Sparkles className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <span>Results: {fileName}</span>
-            {isDemo && (
-              <span
-                className="ml-0.5 rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-normal tracking-wide text-muted-foreground"
-                title="Sample analysis while API is unavailable or not configured"
-              >
-                Demo mode
-              </span>
-            )}
-          </CardTitle>
-          <CardDescription className="mt-2 text-pretty">
+      <Card className="min-w-0 overflow-hidden border-border/50 shadow-sm">
+        <CardHeader className="border-b border-border/40 bg-linear-to-r from-muted/30 to-muted/10 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base sm:text-lg">
+              <Sparkles className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="min-w-0 break-words">Results: {fileName}</span>
+              {isDemo && (
+                <span
+                  className="ml-0.5 rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-normal tracking-wide text-muted-foreground"
+                  title="Sample analysis while API is unavailable or not configured"
+                >
+                  Demo mode
+                </span>
+              )}
+            </CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full shrink-0 gap-2 sm:w-auto"
+              onClick={handleDownloadReport}
+            >
+              <Download className="size-4" />
+              Download report
+            </Button>
+          </div>
+          <CardDescription className="mt-3 text-pretty sm:mt-2">
             <JargonRichText text={analysis.overallSummary} glossary={glossary} />
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6 px-5 py-6 sm:space-y-7 sm:px-6 sm:py-7">
+        <CardContent className="space-y-6 px-4 py-5 sm:space-y-7 sm:px-6 sm:py-7">
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 font-semibold text-foreground">
               <AlertTriangle className="size-4 shrink-0 text-amber-500" />
@@ -119,9 +148,9 @@ export function Results({ analysis, fileName, demoMode = false }: ResultsProps) 
             {hiddenFees.found ? (
               <>
                 {hiddenFees.items.map((item, i) => (
-                  <div key={i} className="rounded-xl border border-border/60 bg-card/80 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm text-foreground">
+                  <div key={i} className="rounded-xl border border-border/60 bg-card/80 p-3 sm:p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                      <p className="min-w-0 text-sm text-foreground">
                         <JargonRichText text={item.description} glossary={glossary} />
                       </p>
                       <RiskBadge level={item.riskLevel} />
@@ -207,9 +236,9 @@ export function Results({ analysis, fileName, demoMode = false }: ResultsProps) 
             {liabilityRisks.found ? (
               <>
                 {liabilityRisks.items.map((item, i) => (
-                  <div key={i} className="rounded-xl border border-border/60 bg-card/80 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">
+                  <div key={i} className="rounded-xl border border-border/60 bg-card/80 p-3 sm:p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                      <p className="min-w-0 text-sm font-medium text-foreground">
                         <JargonRichText text={item.clause} glossary={glossary} />
                       </p>
                       <RiskBadge level={item.riskLevel} />
@@ -277,6 +306,8 @@ export function Results({ analysis, fileName, demoMode = false }: ResultsProps) 
               </div>
             )}
           </section>
+
+          <LegalDisclaimer variant="card" className="mt-2" />
         </CardContent>
       </Card>
     </Tooltip.Provider>

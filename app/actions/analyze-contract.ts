@@ -175,6 +175,33 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   }
 }
 
+/** Max wait for OpenAI before falling back to demo analysis (avoids hanging UI). */
+const OPENAI_ANALYSIS_TIMEOUT_MS = 90_000;
+
+async function analyzeWithOpenAIWithinTimeout(
+  openai: OpenAI,
+  buffer: Buffer,
+  type: string
+): Promise<{ result: ContractAnalysis | null; timedOut: boolean }> {
+  let settled = false;
+  return new Promise((resolve) => {
+    const t = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve({ result: null, timedOut: true });
+      }
+    }, OPENAI_ANALYSIS_TIMEOUT_MS);
+
+    analyzeWithOpenAI(openai, buffer, type).then((r) => {
+      clearTimeout(t);
+      if (!settled) {
+        settled = true;
+        resolve({ result: r, timedOut: false });
+      }
+    });
+  });
+}
+
 async function analyzeWithOpenAI(
   openai: OpenAI,
   buffer: Buffer,
@@ -244,10 +271,18 @@ async function analyzeWithOpenAI(
   }
 }
 
+export type DemoFallbackReason = "timeout" | "openai_failed";
+
 export async function analyzeContract(
   formData: FormData
 ): Promise<
-  | { success: true; contractId: string; demoMode: boolean }
+  | {
+      success: true;
+      contractId: string;
+      demoMode: boolean;
+      /** Set when demo results are shown after a failed or timed-out API call (not when the API key is missing). */
+      demoFallbackReason?: DemoFallbackReason;
+    }
   | { success: false; error: string }
 > {
   try {
@@ -282,15 +317,25 @@ export async function analyzeContract(
     const apiKey = process.env.OPENAI_API_KEY;
     let analysis: ContractAnalysis;
     let demoMode = false;
+    let demoFallbackReason: DemoFallbackReason | undefined;
 
     if (apiKey) {
       const openai = new OpenAI({ apiKey });
-      const aiResult = await analyzeWithOpenAI(openai, buffer, type);
-      if (aiResult) {
+      const { result: aiResult, timedOut } = await analyzeWithOpenAIWithinTimeout(
+        openai,
+        buffer,
+        type
+      );
+      if (timedOut) {
+        analysis = getMockCommercialLeaseAnalysis();
+        demoMode = true;
+        demoFallbackReason = "timeout";
+      } else if (aiResult) {
         analysis = aiResult;
       } else {
         analysis = getMockCommercialLeaseAnalysis();
         demoMode = true;
+        demoFallbackReason = "openai_failed";
       }
     } else {
       analysis = getMockCommercialLeaseAnalysis();
@@ -338,7 +383,12 @@ export async function analyzeContract(
       return { success: false, error: "Failed to save analysis" };
     }
 
-    return { success: true, contractId: contract.id, demoMode };
+    return {
+      success: true,
+      contractId: contract.id,
+      demoMode,
+      ...(demoFallbackReason ? { demoFallbackReason } : {}),
+    };
   } catch (err) {
     console.error("Analyze error:", err);
     const message = err instanceof Error ? err.message : "Analysis failed";

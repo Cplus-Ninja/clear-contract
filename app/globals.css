@@ -238,3 +238,17 @@
 .animate-scan-pulse {
   animation: scan-pulse 1.5s ease-in-out infinite;
 }
+
+/* Analyze overlay — indeterminate progress */
+@keyframes analysis-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-analysis-progress {
+  animation: analysis-progress 1.4s ease-in-out infinite;
+}

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Upload, FileText, Image } from "lucide-react";
+import { Upload, FileText, ImageIcon } from "lucide-react";
 import { analyzeContract } from "@/app/actions/analyze-contract";
+import { LegalDisclaimer } from "@/components/legal-disclaimer";
 import { ScanningOverlay } from "@/components/scanning-overlay";
 import { cn } from "@/lib/utils";
 
@@ -22,11 +23,25 @@ export function ContractUpload() {
 
     if (result.success) {
       if (result.demoMode) {
-        toast.message("Demo Mode", {
-          description:
-            "OpenAI isn’t configured or the request failed—showing a sample Commercial Lease analysis so you can explore the product.",
-          duration: 6000,
-        });
+        if (result.demoFallbackReason === "timeout") {
+          toast.message("Analysis took too long", {
+            description:
+              "The AI didn’t finish in time, so we saved a sample Commercial Lease analysis instead. Try a smaller file or try again.",
+            duration: 8000,
+          });
+        } else if (result.demoFallbackReason === "openai_failed") {
+          toast.message("Demo Mode", {
+            description:
+              "We couldn’t complete live AI analysis (empty PDF, API error, or network issue). Showing a sample Commercial Lease audit so you can still explore the app.",
+            duration: 7000,
+          });
+        } else {
+          toast.message("Demo Mode", {
+            description:
+              "OpenAI isn’t configured—showing a sample Commercial Lease analysis so you can explore the product.",
+            duration: 6000,
+          });
+        }
       }
       router.refresh();
       router.push(`/dashboard?contract=${result.contractId}`);
@@ -44,7 +59,7 @@ export function ContractUpload() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative space-y-4">
       <form
         action={handleSubmit}
         className="space-y-4"
@@ -66,7 +81,7 @@ export function ContractUpload() {
       >
         <label
           className={cn(
-            "relative flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300",
+            "relative flex min-h-[220px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-10 text-center cursor-pointer transition-all duration-300 sm:min-h-[280px] sm:p-12",
             "bg-gradient-to-b from-muted/30 to-muted/10",
             dragActive && "scale-[1.01] border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 shadow-lg shadow-emerald-500/10",
             !dragActive && "hover:border-emerald-500/50 hover:bg-muted/20 hover:shadow-md",
@@ -110,11 +125,11 @@ export function ContractUpload() {
               </p>
               <div className="mt-6 flex gap-6 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <FileText className="size-4" />
+                  <FileText className="size-4" aria-hidden />
                   PDF
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Image className="size-4" />
+                  <ImageIcon className="size-4" aria-hidden />
                   PNG, JPEG, WebP
                 </span>
               </div>
@@ -126,6 +141,7 @@ export function ContractUpload() {
           <p className="text-center text-sm text-destructive">{error}</p>
         )}
       </form>
+      <LegalDisclaimer variant="compact" />
     </div>
   );
 }

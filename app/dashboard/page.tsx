@@ -49,9 +49,9 @@ export default async function DashboardPage({
         </section>
 
         {/* Main content: Recent Audits + Analysis */}
-        <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-3">
           {/* Recent Audits - Card list */}
-          <div className="space-y-3 sm:space-y-4 lg:col-span-1">
+          <div className="min-w-0 space-y-3 sm:space-y-4 lg:col-span-1">
             <h2 className="text-base font-semibold text-foreground sm:text-lg">
               Recent Audits
             </h2>
@@ -75,6 +75,7 @@ export default async function DashboardPage({
                   <Link
                     key={contract.id}
                     href={`/dashboard?contract=${contract.id}`}
+                    className="block touch-manipulation active:scale-[0.99]"
                   >
                     <Card
                       className={cn(
@@ -84,14 +85,14 @@ export default async function DashboardPage({
                           : "hover:border-emerald-500/30"
                       )}
                     >
-                      <CardHeader className="pb-2 pt-4">
-                        <CardTitle className="flex items-center justify-between gap-2 text-sm font-medium">
-                          <span className="truncate">
+                      <CardHeader className="px-4 pb-2 pt-3 sm:px-6 sm:pt-4">
+                        <CardTitle className="flex items-start justify-between gap-3 text-sm font-medium leading-snug">
+                          <span className="min-w-0 flex-1 break-words">
                             {contract.file_name}
                           </span>
                           <ChevronRight
                             className={cn(
-                              "size-4 shrink-0 text-muted-foreground transition-transform",
+                              "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
                               selectedContract?.id === contract.id &&
                                 "text-emerald-600 dark:text-emerald-400"
                             )}
@@ -116,7 +117,7 @@ export default async function DashboardPage({
           </div>
 
           {/* Analysis view */}
-          <div className="lg:col-span-2">
+          <div className="min-w-0 overflow-x-hidden lg:col-span-2">
             {selectedContract ? (
               <Results
                 analysis={selectedContract.analysis as unknown as ContractAnalysis}
