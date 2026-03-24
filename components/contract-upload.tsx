@@ -21,6 +21,13 @@ export function ContractUpload() {
     const result = await analyzeContract(formData);
 
     if (result.success) {
+      if (result.demoMode) {
+        toast.message("Demo Mode", {
+          description:
+            "OpenAI isn’t configured or the request failed—showing a sample Commercial Lease analysis so you can explore the product.",
+          duration: 6000,
+        });
+      }
       router.refresh();
       router.push(`/dashboard?contract=${result.contractId}`);
     } else {

@@ -121,6 +121,9 @@ export default async function DashboardPage({
               <Results
                 analysis={selectedContract.analysis as unknown as ContractAnalysis}
                 fileName={selectedContract.file_name}
+                demoMode={Boolean(
+                  (selectedContract.analysis as { demoMode?: boolean }).demoMode
+                )}
               />
             ) : contracts.length > 0 ? (
               <Card>

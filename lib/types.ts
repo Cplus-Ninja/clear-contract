@@ -1,4 +1,6 @@
 export interface ContractAnalysis {
+  /** Set when analysis is mock/sample data (demo without OpenAI). */
+  demoMode?: boolean;
   hiddenFees: {
     found: boolean;
     items: Array<{

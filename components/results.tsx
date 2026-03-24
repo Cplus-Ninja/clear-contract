@@ -12,6 +12,7 @@ import { generateNegotiationEmail } from "@/app/actions/generate-negotiation-ema
 interface ResultsProps {
   analysis: ContractAnalysis;
   fileName: string;
+  demoMode?: boolean;
 }
 
 const riskColors = {
@@ -29,10 +30,13 @@ function RiskBadge({ level }: { level: "low" | "medium" | "high" }) {
   );
 }
 
-export function Results({ analysis, fileName }: ResultsProps) {
+export function Results({ analysis, fileName, demoMode = false }: ResultsProps) {
   const [email, setEmail] = useState("");
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const isDemo =
+    demoMode ||
+    analysis.demoMode === true;
   const hiddenFees = analysis.hiddenFees ?? { found: false, items: [], summary: "" };
   const terminationClauses = analysis.terminationClauses ?? {
     found: false,
@@ -58,9 +62,17 @@ export function Results({ analysis, fileName }: ResultsProps) {
   return (
     <Card className="overflow-hidden border-border/50 shadow-sm">
       <CardHeader className="border-b border-border/40 bg-gradient-to-r from-muted/30 to-muted/10">
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
           <Sparkles className="size-5 text-emerald-600 dark:text-emerald-400" />
-          Results: {fileName}
+          <span>Results: {fileName}</span>
+          {isDemo && (
+            <Badge
+              variant="outline"
+              className="text-[10px] font-semibold uppercase tracking-wide border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+            >
+              Demo Mode
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>{analysis.overallSummary}</CardDescription>
       </CardHeader>
