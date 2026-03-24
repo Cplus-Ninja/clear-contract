@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ContractUpload } from "@/components/contract-upload";
-import { ContractAnalysisCard } from "@/components/contract-analysis-card";
+import { Results } from "@/components/results";
 import { SetupToastTrigger } from "@/components/setup-toast-trigger";
 import { getContracts } from "@/app/actions/contracts";
 import {
@@ -118,7 +118,7 @@ export default async function DashboardPage({
           {/* Analysis view */}
           <div className="lg:col-span-2">
             {selectedContract ? (
-              <ContractAnalysisCard
+              <Results
                 analysis={selectedContract.analysis as unknown as ContractAnalysis}
                 fileName={selectedContract.file_name}
               />

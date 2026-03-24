@@ -7,6 +7,7 @@ import OpenAI from "openai";
 const ANALYSIS_PROMPT = `You are a contract analyst. Analyze the following contract document for:
 1. HIDDEN FEES - any fees, charges, or costs that may not be immediately obvious (subscription fees, early termination fees, auto-renewal charges, processing fees, etc.)
 2. TERMINATION CLAUSES - conditions for ending the agreement, notice periods, penalties for early termination, auto-renewal terms
+3. LIABILITY RISKS - indemnification obligations, limitation of liability carve-outs, broad warranties, uncapped damages, one-sided risk transfer
 
 Respond with ONLY a valid JSON object in this exact format (no markdown, no code blocks):
 {
@@ -30,6 +31,18 @@ Respond with ONLY a valid JSON object in this exact format (no markdown, no code
         "description": "brief description",
         "noticePeriod": "if specified",
         "penalties": "if any",
+        "riskLevel": "low" | "medium" | "high"
+      }
+    ],
+    "summary": "one sentence summary"
+  },
+  "liabilityRisks": {
+    "found": true/false,
+    "items": [
+      {
+        "clause": "name of the liability-related clause",
+        "description": "brief description",
+        "impact": "how this could harm the buyer",
         "riskLevel": "low" | "medium" | "high"
       }
     ],
@@ -64,6 +77,11 @@ function parseAnalysisResponse(text: string): ContractAnalysis {
       found: parsed.terminationClauses.found ?? false,
       items: parsed.terminationClauses.items ?? [],
       summary: parsed.terminationClauses.summary ?? "",
+    },
+    liabilityRisks: {
+      found: parsed.liabilityRisks?.found ?? false,
+      items: parsed.liabilityRisks?.items ?? [],
+      summary: parsed.liabilityRisks?.summary ?? "",
     },
     overallSummary: parsed.overallSummary ?? "",
   };
@@ -146,7 +164,7 @@ export async function analyzeContract(
             content: [
               {
                 type: "text",
-                text: "Analyze this contract image for hidden fees and termination clauses. Respond with ONLY the JSON object as specified.",
+                text: "Analyze this contract image for hidden fees, termination clauses, and liability risks. Respond with ONLY the JSON object as specified.",
               },
               {
                 type: "image_url",

@@ -20,5 +20,15 @@ export interface ContractAnalysis {
     }>;
     summary: string;
   };
+  liabilityRisks: {
+    found: boolean;
+    items: Array<{
+      clause: string;
+      description: string;
+      impact: string;
+      riskLevel: "low" | "medium" | "high";
+    }>;
+    summary: string;
+  };
   overallSummary: string;
 }
