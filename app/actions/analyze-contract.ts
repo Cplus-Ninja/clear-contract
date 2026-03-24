@@ -4,54 +4,39 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { ContractAnalysis } from "@/lib/types";
 import OpenAI from "openai";
 
-const ANALYSIS_PROMPT = `You are a contract analyst. Analyze the following contract document for:
-1. HIDDEN FEES - any fees, charges, or costs that may not be immediately obvious (subscription fees, early termination fees, auto-renewal charges, processing fees, etc.)
-2. TERMINATION CLAUSES - conditions for ending the agreement, notice periods, penalties for early termination, auto-renewal terms
-3. LIABILITY RISKS - indemnification obligations, limitation of liability carve-outs, broad warranties, uncapped damages, one-sided risk transfer
+const ANALYSIS_PROMPT = `You are a Friendly but Expert Small Business Legal Auditor. Your job is to help non-lawyers understand contract risk in plain language—warm, clear, and practical, never alarmist without cause.
 
-Respond with ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+Scope and context:
+- Prioritize issues that matter to US small businesses (payment terms, renewals, liability caps, indemnities, termination, warranties, dispute resolution, governing law).
+- When the document mentions Missouri, Springfield, Greene County, or Missouri-specific statutes or courts, note that local context briefly in overallSummary or relevant item descriptions. If there is no local tie, do not invent one—stick to what the contract says and general US small-business norms.
+
+Analyze for:
+1. HIDDEN FEES — costs that are easy to miss (renewals, termination fees, price escalations, pass-throughs, minimums, etc.)
+2. TERMINATION CLAUSES — how the deal ends, notice, penalties, auto-renewal
+3. LIABILITY RISKS — indemnity, liability caps/carve-outs, warranties, one-sided risk
+
+Output rules (critical — the UI parses this with JSON.parse):
+- Respond with ONE JSON object only. No markdown, no code fences, no commentary before or after.
+- Use double quotes for all keys and string values. No trailing commas. Use true/false/null as JSON literals.
+- riskLevel must be exactly "low", "medium", or "high".
+
+Include a jargonGlossary: 5–12 entries for substantive legal or contract terms that appear in YOUR written analysis (overallSummary, summaries, and item text). Each term should be the exact wording a reader will see (so tooltips can match). Each definition: one short sentence in plain English.
+
+Required JSON shape:
 {
-  "hiddenFees": {
-    "found": true/false,
-    "items": [
-      {
-        "description": "brief description of the fee",
-        "location": "section or page reference",
-        "amount": "if specified",
-        "riskLevel": "low" | "medium" | "high"
-      }
-    ],
-    "summary": "one sentence summary"
-  },
-  "terminationClauses": {
-    "found": true/false,
-    "items": [
-      {
-        "type": "e.g. early termination, cancellation",
-        "description": "brief description",
-        "noticePeriod": "if specified",
-        "penalties": "if any",
-        "riskLevel": "low" | "medium" | "high"
-      }
-    ],
-    "summary": "one sentence summary"
-  },
-  "liabilityRisks": {
-    "found": true/false,
-    "items": [
-      {
-        "clause": "name of the liability-related clause",
-        "description": "brief description",
-        "impact": "how this could harm the buyer",
-        "riskLevel": "low" | "medium" | "high"
-      }
-    ],
-    "summary": "one sentence summary"
-  },
-  "overallSummary": "2-3 sentence overall assessment"
+  "hiddenFees": { "found": boolean, "items": [...], "summary": string },
+  "terminationClauses": { "found": boolean, "items": [...], "summary": string },
+  "liabilityRisks": { "found": boolean, "items": [...], "summary": string },
+  "overallSummary": string,
+  "jargonGlossary": [ { "term": string, "definition": string } ]
 }
 
-If nothing is found in a category, use found: false and empty items array.`;
+Item shapes:
+- hiddenFees.items[]: { "description", "location", "amount", "riskLevel" } — amount may be "" if unknown
+- terminationClauses.items[]: { "type", "description", "noticePeriod", "penalties", "riskLevel" } — use "" for unknown optional strings
+- liabilityRisks.items[]: { "clause", "description", "impact", "riskLevel" }
+
+If nothing is found in a category, use "found": false and "items": []. Use "jargonGlossary": [] only if there are truly no terms worth defining.`;
 
 function parseAnalysisResponse(text: string): ContractAnalysis {
   // Remove markdown code blocks if present
@@ -66,6 +51,23 @@ function parseAnalysisResponse(text: string): ContractAnalysis {
   if (!parsed.hiddenFees || !parsed.terminationClauses) {
     throw new Error("Invalid analysis format");
   }
+
+  const rawGlossary = parsed.jargonGlossary;
+  const jargonGlossary = Array.isArray(rawGlossary)
+    ? rawGlossary
+        .filter(
+          (e: unknown) =>
+            e &&
+            typeof e === "object" &&
+            typeof (e as { term?: string }).term === "string" &&
+            typeof (e as { definition?: string }).definition === "string"
+        )
+        .map((e) => ({
+          term: (e as { term: string }).term.trim(),
+          definition: (e as { definition: string }).definition.trim(),
+        }))
+        .filter((e) => e.term.length > 0 && e.definition.length > 0)
+    : [];
 
   return {
     hiddenFees: {
@@ -84,6 +86,7 @@ function parseAnalysisResponse(text: string): ContractAnalysis {
       summary: parsed.liabilityRisks?.summary ?? "",
     },
     overallSummary: parsed.overallSummary ?? "",
+    ...(jargonGlossary.length > 0 ? { jargonGlossary } : {}),
   };
 }
 
@@ -136,6 +139,28 @@ function getMockCommercialLeaseAnalysis(): ContractAnalysis {
     },
     overallSummary:
       "This demo reflects a stringent Commercial Lease Agreement: aggressive fixed rent escalations, weak early-termination protections, and landlord-friendly operating-expense pass-throughs. These are illustrative findings for judges when live AI analysis is unavailable.",
+    jargonGlossary: [
+      {
+        term: "liquidated damages",
+        definition:
+          "A fixed amount of money the contract says one party owes if they break the deal—often used instead of proving actual losses.",
+      },
+      {
+        term: "mitigate",
+        definition:
+          "To take reasonable steps to reduce harm or losses (for example, a landlord trying to re-rent space after a tenant leaves).",
+      },
+      {
+        term: "CAM",
+        definition:
+          "Common Area Maintenance—your share of costs to run shared parts of a building (hallways, parking, landscaping, etc.).",
+      },
+      {
+        term: "reconciliation",
+        definition:
+          "An accounting true-up: comparing estimated charges to actual costs and billing the difference.",
+      },
+    ],
   };
 }
 
@@ -194,7 +219,7 @@ async function analyzeWithOpenAI(
             content: [
               {
                 type: "text",
-                text: "Analyze this contract image for hidden fees, termination clauses, and liability risks. Respond with ONLY the JSON object as specified.",
+                text: `This is a contract or legal document provided as an image. Use your vision capabilities to read all visible text carefully (OCR-quality transcription in your head), including headers, footnotes, and fine print. Then perform the full analysis and respond with ONLY the single JSON object specified in the system message—no other text.`,
               },
               {
                 type: "image_url",

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { FileCheck2, LayoutDashboard, Home, Upload } from "lucide-react";
+import { FileCheck2, LayoutDashboard, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function DashboardLayout({
@@ -12,14 +12,14 @@ export default function DashboardLayout({
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className="sticky top-0 flex h-screen w-64 flex-col border-r border-border/40 bg-card/50 backdrop-blur">
-        <div className="flex h-16 items-center gap-2 border-b border-border/40 px-6">
+        <div className="flex h-14 items-center gap-2 border-b border-border/40 px-5 sm:h-16 sm:px-6">
           <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
             <FileCheck2 className="size-4" />
           </div>
           <span className="font-semibold text-foreground">ClearContract</span>
         </div>
 
-        <nav className="flex-1 space-y-1 p-4">
+        <nav className="flex-1 space-y-0.5 p-3 sm:p-4">
           <Link
             href="/dashboard"
             className={cn(
@@ -39,7 +39,7 @@ export default function DashboardLayout({
           </Link>
         </nav>
 
-        <div className="border-t border-border/40 p-4">
+        <div className="border-t border-border/40 p-3 sm:p-4">
           <ThemeToggle />
         </div>
       </aside>

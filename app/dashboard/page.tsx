@@ -32,27 +32,27 @@ export default async function DashboardPage({
       <div className="pointer-events-none fixed inset-0 -z-10 landing-grid-bg [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,black_30%,transparent_100%)]" />
       <SetupToastTrigger setupNeeded={setupNeeded} />
 
-      <div className="p-8">
+      <div className="mx-auto max-w-[1600px] px-5 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         {/* Page header */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Dashboard
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
             Upload and audit your contracts with AI
           </p>
         </div>
 
         {/* Upload zone */}
-        <section className="mb-12">
+        <section className="mb-8 sm:mb-10 lg:mb-12">
           <ContractUpload />
         </section>
 
         {/* Main content: Recent Audits + Analysis */}
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
           {/* Recent Audits - Card list */}
-          <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">
+          <div className="space-y-3 sm:space-y-4 lg:col-span-1">
+            <h2 className="text-base font-semibold text-foreground sm:text-lg">
               Recent Audits
             </h2>
             {contracts.length === 0 ? (

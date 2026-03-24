@@ -1,6 +1,14 @@
+/** Terms the AI flags for plain-language “Jargon Buster” tooltips in the UI. */
+export interface JargonGlossaryEntry {
+  term: string;
+  definition: string;
+}
+
 export interface ContractAnalysis {
   /** Set when analysis is mock/sample data (demo without OpenAI). */
   demoMode?: boolean;
+  /** Complex legal terms with short definitions for hover tooltips. */
+  jargonGlossary?: JargonGlossaryEntry[];
   hiddenFees: {
     found: boolean;
     items: Array<{
