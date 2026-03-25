@@ -9,16 +9,27 @@ import { LegalDisclaimer } from "@/components/legal-disclaimer";
 import { ScanningOverlay } from "@/components/scanning-overlay";
 import { cn } from "@/lib/utils";
 
+const CONTRACT_TYPE_OPTIONS = [
+  { value: "general", label: "General / other" },
+  { value: "commercial_lease", label: "Commercial lease" },
+  { value: "service_agreement", label: "Service agreement" },
+  { value: "nda", label: "NDA" },
+  { value: "other", label: "Other" },
+] as const;
+
 export function ContractUpload() {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [contractType, setContractType] =
+    useState<(typeof CONTRACT_TYPE_OPTIONS)[number]["value"]>("general");
 
   async function handleSubmit(formData: FormData) {
     setUploading(true);
     setError(null);
 
+    formData.set("contract_type", contractType);
     const result = await analyzeContract(formData);
 
     if (result.success) {
@@ -75,10 +86,32 @@ export function ContractUpload() {
           if (file) {
             const formData = new FormData();
             formData.set("file", file);
+            formData.set("contract_type", contractType);
             handleSubmit(formData);
           }
         }}
       >
+        <div className="mb-4 w-full max-w-md text-left">
+          <label htmlFor="contract-type" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+            Contract type
+          </label>
+          <select
+            id="contract-type"
+            name="contract_type"
+            value={contractType}
+            onChange={(e) =>
+              setContractType(e.target.value as (typeof CONTRACT_TYPE_OPTIONS)[number]["value"])
+            }
+            disabled={uploading}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2 disabled:opacity-50"
+          >
+            {CONTRACT_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <label
           className={cn(
             "relative flex min-h-[220px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-10 text-center cursor-pointer transition-all duration-300 sm:min-h-[280px] sm:p-12",
@@ -99,6 +132,7 @@ export function ContractUpload() {
               if (file) {
                 const formData = new FormData();
                 formData.set("file", file);
+                formData.set("contract_type", contractType);
                 handleSubmit(formData);
               }
             }}

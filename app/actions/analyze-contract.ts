@@ -3,6 +3,25 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { ContractAnalysis } from "@/lib/types";
 import OpenAI from "openai";
+// pdf-parse v1 bundles a legacy PDF.js build — avoids pdfjs-dist + DOMMatrix on the server (see v2 / canvas path)
+import pdfParse from "pdf-parse";
+
+const CONTRACT_TYPES = [
+  "general",
+  "commercial_lease",
+  "service_agreement",
+  "nda",
+  "other",
+] as const;
+
+function getContractType(formData: FormData): string {
+  const raw = formData.get("contract_type");
+  if (typeof raw === "string" && raw.trim()) {
+    const t = raw.trim();
+    if ((CONTRACT_TYPES as readonly string[]).includes(t)) return t;
+  }
+  return "general";
+}
 
 const ANALYSIS_PROMPT = `You are a Friendly but Expert Small Business Legal Auditor. Your job is to help non-lawyers understand contract risk in plain language—warm, clear, and practical, never alarmist without cause.
 
@@ -165,14 +184,8 @@ function getMockCommercialLeaseAnalysis(): ContractAnalysis {
 }
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    return result.text;
-  } finally {
-    await parser.destroy();
-  }
+  const data = await pdfParse(buffer);
+  return typeof data.text === "string" ? data.text : "";
 }
 
 /** Max wait for OpenAI before falling back to demo analysis (avoids hanging UI). */
@@ -298,6 +311,7 @@ export async function analyzeContract(
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const type = file.type.toLowerCase();
+    const contract_type = getContractType(formData);
     const supportedTypes = [
       "application/pdf",
       "image/png",
@@ -373,6 +387,7 @@ export async function analyzeContract(
         file_name: file.name,
         file_url: fileUrl,
         file_type: file.type,
+        contract_type,
         analysis: analysisForDb,
       })
       .select("id")

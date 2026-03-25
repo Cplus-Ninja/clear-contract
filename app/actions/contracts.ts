@@ -7,6 +7,7 @@ export interface ContractRecord {
   file_name: string;
   file_url: string;
   file_type: string;
+  contract_type: string;
   created_at: string;
   analysis: Record<string, unknown>;
 }
