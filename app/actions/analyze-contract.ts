@@ -183,104 +183,118 @@ function getMockCommercialLeaseAnalysis(): ContractAnalysis {
   };
 }
 
+/** pdf-parse expects a Node Buffer; copy via Buffer.from() (avoid deprecated `new Buffer()` patterns). */
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const data = await pdfParse(buffer);
-  return typeof data.text === "string" ? data.text : "";
+  const pdfBuffer = Buffer.from(buffer);
+  const data = await pdfParse(pdfBuffer);
+  const text = typeof data.text === "string" ? data.text : "";
+  console.log("PDF text extracted:", text.substring(0, 100));
+  return text;
 }
 
-/** Max wait for OpenAI before falling back to demo analysis (avoids hanging UI). */
-const OPENAI_ANALYSIS_TIMEOUT_MS = 90_000;
+/** Abort OpenAI request if it exceeds this — caller shows Demo (mock) analysis. */
+const OPENAI_REQUEST_TIMEOUT_MS = 25_000;
 
-async function analyzeWithOpenAIWithinTimeout(
-  openai: OpenAI,
-  buffer: Buffer,
-  type: string
-): Promise<{ result: ContractAnalysis | null; timedOut: boolean }> {
-  let settled = false;
+function openaiRequestTimedOutPromise(): Promise<"timeout"> {
   return new Promise((resolve) => {
-    const t = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve({ result: null, timedOut: true });
-      }
-    }, OPENAI_ANALYSIS_TIMEOUT_MS);
-
-    analyzeWithOpenAI(openai, buffer, type).then((r) => {
-      clearTimeout(t);
-      if (!settled) {
-        settled = true;
-        resolve({ result: r, timedOut: false });
-      }
-    });
+    setTimeout(() => resolve("timeout"), OPENAI_REQUEST_TIMEOUT_MS);
   });
 }
 
+type AnalyzeOpenAIOutcome =
+  | { status: "ok"; analysis: ContractAnalysis }
+  | { status: "timeout" }
+  | { status: "failed" };
+
+/**
+ * Calls OpenAI with a 25s cap per request. On timeout or error, returns a status so the caller can use Demo fallback.
+ */
 async function analyzeWithOpenAI(
   openai: OpenAI,
   buffer: Buffer,
   type: string
-): Promise<ContractAnalysis | null> {
+): Promise<AnalyzeOpenAIOutcome> {
   const imageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
 
   try {
     if (type === "application/pdf") {
       const text = await extractTextFromPdf(buffer);
       if (!text.trim()) {
-        return null;
+        return { status: "failed" };
       }
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: ANALYSIS_PROMPT },
-          {
-            role: "user",
-            content: `Analyze this contract:\n\n${text.slice(0, 120000)}`,
-          },
-        ],
-        response_format: { type: "json_object" },
-      });
+      const completion = await Promise.race([
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: ANALYSIS_PROMPT },
+            {
+              role: "user",
+              content: `Analyze this contract:\n\n${text.slice(0, 120000)}`,
+            },
+          ],
+          response_format: { type: "json_object" },
+        }),
+        openaiRequestTimedOutPromise(),
+      ]);
+
+      if (completion === "timeout") {
+        console.log(
+          `[ClearContract] OpenAI PDF analysis exceeded ${OPENAI_REQUEST_TIMEOUT_MS / 1000}s — using Demo fallback`
+        );
+        return { status: "timeout" };
+      }
 
       const content = completion.choices[0]?.message?.content;
-      if (!content) return null;
-      return parseAnalysisResponse(content);
+      if (!content) return { status: "failed" };
+      return { status: "ok", analysis: parseAnalysisResponse(content) };
     }
 
     if (imageTypes.includes(type)) {
-      const base64 = buffer.toString("base64");
+      const base64 = Buffer.from(buffer).toString("base64");
       const mimeType = type === "image/jpg" ? "image/jpeg" : type;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: ANALYSIS_PROMPT },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `This is a contract or legal document provided as an image. Use your vision capabilities to read all visible text carefully (OCR-quality transcription in your head), including headers, footnotes, and fine print. Then perform the full analysis and respond with ONLY the single JSON object specified in the system message—no other text.`,
-              },
-              {
-                type: "image_url",
-                image_url: { url: `data:${mimeType};base64,${base64}` },
-              },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 4096,
-      });
+      const completion = await Promise.race([
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: ANALYSIS_PROMPT },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `This is a contract or legal document provided as an image. Use your vision capabilities to read all visible text carefully (OCR-quality transcription in your head), including headers, footnotes, and fine print. Then perform the full analysis and respond with ONLY the single JSON object specified in the system message—no other text.`,
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:${mimeType};base64,${base64}` },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 4096,
+        }),
+        openaiRequestTimedOutPromise(),
+      ]);
+
+      if (completion === "timeout") {
+        console.log(
+          `[ClearContract] OpenAI image analysis exceeded ${OPENAI_REQUEST_TIMEOUT_MS / 1000}s — using Demo fallback`
+        );
+        return { status: "timeout" };
+      }
 
       const content = completion.choices[0]?.message?.content;
-      if (!content) return null;
-      return parseAnalysisResponse(content);
+      if (!content) return { status: "failed" };
+      return { status: "ok", analysis: parseAnalysisResponse(content) };
     }
 
-    return null;
+    return { status: "failed" };
   } catch (err) {
-    console.error("OpenAI analysis failed (demo fallback):", err);
-    return null;
+    console.error("[ClearContract] OpenAI analysis failed — Demo fallback:", err);
+    return { status: "failed" };
   }
 }
 
@@ -334,22 +348,14 @@ export async function analyzeContract(
     let demoFallbackReason: DemoFallbackReason | undefined;
 
     if (apiKey) {
-      const openai = new OpenAI({ apiKey });
-      const { result: aiResult, timedOut } = await analyzeWithOpenAIWithinTimeout(
-        openai,
-        buffer,
-        type
-      );
-      if (timedOut) {
-        analysis = getMockCommercialLeaseAnalysis();
-        demoMode = true;
-        demoFallbackReason = "timeout";
-      } else if (aiResult) {
-        analysis = aiResult;
+      const openai = new OpenAI({ apiKey, timeout: OPENAI_REQUEST_TIMEOUT_MS + 5_000 });
+      const outcome = await analyzeWithOpenAI(openai, buffer, type);
+      if (outcome.status === "ok") {
+        analysis = outcome.analysis;
       } else {
         analysis = getMockCommercialLeaseAnalysis();
         demoMode = true;
-        demoFallbackReason = "openai_failed";
+        demoFallbackReason = outcome.status === "timeout" ? "timeout" : "openai_failed";
       }
     } else {
       analysis = getMockCommercialLeaseAnalysis();
